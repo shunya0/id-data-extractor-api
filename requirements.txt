@@ -1,0 +1,11 @@
+torch
+numpy==1.26.4
+pillow
+scikit-image
+easyocr
+spacy
+spacy-transformers
+Flask
+werkzeug
+flask_swagger_ui
+Flask_Limiter

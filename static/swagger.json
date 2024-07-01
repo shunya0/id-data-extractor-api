@@ -1,0 +1,108 @@
+{
+    "swagger": "2.0",
+    "info": {
+      "description": "This AI-powered API automates data extraction from identity documents (passports, ID cards, driver's licenses) using image preprocessing, Optical Character Recognition (OCR), and Named Entity Recognition (NER). It streamlines data entry workflows and improves accuracy by extracting data points like names, addresses, ID numbers, and expiry dates. The API utilizes secure authentication (details in Security Definitions) and provides extracted data in a structured format (e.g., JSON).",
+      "version": "1.0",
+      "title": "AI-Powered ID Data Extraction API"
+    },
+    "securityDefinitions": {
+      "api_key": {
+        "type": "apiKey",
+        "name": "X-API-KEY",
+        "in": "header"
+      }
+    },
+    "security": [
+      { "api_key": [] }
+    ],
+    "paths": {
+      "/api/v1/extract-data-from-image": {
+        "post": {
+          "summary": "Upload an image (PNG, JPEG, JPG)",
+          "description": "Upload an image as form data or in binary format, for data extraction. The API is rate limited: 200 requests per day; 20 requests per hour.",
+          "consumes": [
+            "multipart/form-data"
+          ],
+          "produces": [
+            "application/json"
+          ],
+          "parameters": [
+            {
+              "name": "image",
+              "in": "formData",
+              "type": "file",
+              "required": true,
+              "description": "The image file to upload"
+            }
+          ],
+          "responses": {
+            "201": {
+              "description": "Image processed successfully",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "message": {
+                        "type": "string",
+                        "description": "Success message"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Bad request (e.g., no image data, invalid format)",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "error": {
+                        "type": "string",
+                        "description": "Error message"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Unauthorized access (invalid API key)",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "error": {
+                        "type": "string",
+                        "description": "Error message"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "415": {
+              "description": "Unsupported image format",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "type": "object",
+                    "properties": {
+                      "error": {
+                        "type": "string",
+                        "description": "Error message"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
