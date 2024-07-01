@@ -1,6 +1,7 @@
 import spacy
+from flask import current_app
 
-model_path = "E:\\custom_ner_model\\output\\model-last"
+model_path = current_app.config['NER_MODEL_PATH']
 
 # Load your custom spaCy NER model
 nlp = spacy.load(model_path)

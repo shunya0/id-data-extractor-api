@@ -62,7 +62,10 @@ def EnhanceImage(image_path,
         for i, te_data in enumerate(loader):
             lr = te_data['LR'].to(device)
             output, _ = generator(lr)
-            output = output[0].cpu().numpy()
+            if torch.cuda.is_available():
+                output = output[0].cuda().numpy()
+            else:
+                output = output[0].cpu().numpy()
             output = (output + 1.0) / 2.0
             output = output.transpose(1,2,0)
             result = Image.fromarray((output * 255.0).astype(np.uint8))

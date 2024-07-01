@@ -2,19 +2,37 @@ import uuid
 import os
 from preprocess import EnhanceImage
 from flask import Flask, request, jsonify, make_response, redirect, url_for
+# Initialize Flask app
+app = Flask(__name__, static_folder='./static')
+
+# Create an application context
+app_ctx = app.app_context()
+app_ctx.push()
+
 from flask_swagger_ui import get_swaggerui_blueprint
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from config import DevConfig, ProdConfig
 
 from werkzeug.utils import secure_filename
 from PIL import Image
 
-from ocr import ExtractTextFromImage
-from ner import ExtractEntities
-from response import GenerateResponse
 
-# Initialize Flask app
-app = Flask(__name__, static_folder='./static')
+env = os.getenv('ENV', 'dev')
+if env == 'dev':
+    config = DevConfig()
+elif env == 'prod':
+    config = ProdConfig()
+else:
+    raise ValueError('Invalid environment')
+
+app.config['DEBUG'] = config.DEBUG
+app.config['NER_MODEL_PATH'] = config.NER_MODEL_PATH
+
+with app.app_context():
+    from ocr import ExtractTextFromImage
+    from ner import ExtractEntities
+    from response import GenerateResponse
 
 # Configure limiter with global limit of 1000 requests per day
 limiter = Limiter(
@@ -200,4 +218,4 @@ def upload_image():
     
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=app.config['DEBUG'])
