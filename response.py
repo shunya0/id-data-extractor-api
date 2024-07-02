@@ -5,7 +5,8 @@ def GenerateResponse(entities):
         "metadata": {
             "confidence": 0.85,
             "document_type": 'passport'
-        },        
+        },
+        "ocr_ner_pipeline_extractions": entities,        
         "data": {
 
         }  
@@ -28,7 +29,7 @@ def GenerateResponse(entities):
   
     # Extract relevant entities
     for entity in entities:
-        if entity['label'] in ['PERSON NAME', 'COUNTRY', 'PASSPORT TYPE', 'COUNTRY CODE', 'PASSPORT NUMBER']:
+        if entity['label'] in ['PERSON NAME', 'COUNTRY', 'PASSPORT TYPE', 'COUNTRY CODE', 'PASSPORT NUMBER', 'GENDER']:
             data['data'][entity['label'].lower().replace(" ", "_")] = entity['text']
         elif entity['label'] == 'DATE':
             try:

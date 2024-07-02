@@ -90,7 +90,7 @@ def redirect_to_docs():
 
 @app.route('/api/v1/extract-data-from-image', methods=['POST'])
 @authenticate_api_key
-@limiter.limit("200/day;20/hour")
+@limiter.limit("500/day;50/hour")
 def upload_image():
     # Check if request has a file part
     # print(request.data[:10])
@@ -124,19 +124,33 @@ def upload_image():
             img = Image.open(filepath)  # Replace with your image path
         
             # Converting RGBA image to RGB
-            if img.mode == "RGB":
-                print("Image has 3 channels (RGB)")
-            else:
-                print("Image has", len(img.getbands()), "channels (not RGB)")
+            # if img.mode == "RGB":
+            #     print("Image has 3 channels (RGB)")
+            # else:
+            #     print("Image has", len(img.getbands()), "channels (not RGB)")
             
+            #     img.load()
+            #     background = Image.new("RGB", img.size, (255, 255, 255))
+                
+            #     background.paste(img, mask=img.split()[3])
+
+            #     background.save(filepath, 'PNG', quality=100)
+            enhancedImageFilePath = filepath
+
+            if len(img.getbands()) > 3:
+                print("Image has", len(img.getbands()), "channels (not RGB)")
                 img.load()
                 background = Image.new("RGB", img.size, (255, 255, 255))
+                
                 background.paste(img, mask=img.split()[3])
 
                 background.save(filepath, 'PNG', quality=100)
-            
-            # Enhancing image
-            enhancedImageFilePath = EnhanceImage(filepath)
+
+                # Enhancing image
+                enhancedImageFilePath = EnhanceImage(filepath)
+            elif len(img.getbands()) == 3:
+                print("Image has", len(img.getbands()), "channels (RGB)")
+                enhancedImageFilePath = EnhanceImage(filepath)
             
             # Extracting text from image
             accumulated_text = ExtractTextFromImage(enhancedImageFilePath)
@@ -182,22 +196,36 @@ def upload_image():
         with open(filepath, 'wb') as f:
             f.write(image_data)
 
-        img = Image.open(filepath)  # Replace with your image path
+        # img = Image.open(filepath)  # Replace with your image path
         
-        # Converting RGBA image to RGB
-        if img.mode == "RGB":
-            print("Image has 3 channels (RGB)")
-        else:
+        # # Converting RGBA image to RGB
+        # if img.mode == "RGB":
+        #     print("Image has 3 channels (RGB)")
+        # else:
+        #     print("Image has", len(img.getbands()), "channels (not RGB)")
+        
+        #     img.load()
+        #     background = Image.new("RGB", img.size, (255, 255, 255))
+        #     background.paste(img, mask=img.split()[3])
+
+        #     background.save(filepath, 'PNG', quality=100)
+        
+        enhancedImageFilePath = filepath
+
+        if len(img.getbands()) > 3:
             print("Image has", len(img.getbands()), "channels (not RGB)")
-        
             img.load()
             background = Image.new("RGB", img.size, (255, 255, 255))
+            
             background.paste(img, mask=img.split()[3])
 
             background.save(filepath, 'PNG', quality=100)
-        
-        # Enhancing image
-        enhancedImageFilePath = EnhanceImage(filepath)
+
+            # Enhancing image
+            enhancedImageFilePath = EnhanceImage(filepath)
+        elif len(img.getbands()) == 3:
+            print("Image has", len(img.getbands()), "channels (RGB)")
+            enhancedImageFilePath = EnhanceImage(filepath)
         
         # Extracting text from image
         accumulated_text = ExtractTextFromImage(enhancedImageFilePath)
