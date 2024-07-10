@@ -74,3 +74,34 @@ def EnhanceImage(image_path,
             result.save(filepath)
             return filepath
 
+def EnhancedImageGenerator(image_path, 
+              model='./model/preprocess/pre_trained_model_8000.pt', 
+              num_workers=0, 
+              res_num=16,
+              output_dir='./result/'):
+    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    dataset = SingleImageData(image_path, in_memory = False, transform = None)
+    loader = DataLoader(dataset, batch_size = 1, shuffle = False, num_workers = num_workers)
+    
+    generator = Generator(img_feat = 3, n_feats = 64, kernel_size = 3, num_block = res_num)
+    generator.load_state_dict(torch.load(model, map_location=torch.device(device)))
+    generator = generator.to(device)
+    generator.eval()
+
+    with torch.no_grad():
+        for i, te_data in enumerate(loader):
+            lr = te_data['LR'].to(device)
+            output, _ = generator(lr)
+            if torch.cuda.is_available():
+                output = output[0].cuda().numpy()
+            else:
+                output = output[0].cpu().numpy()
+            output = (output + 1.0) / 2.0
+            output = output.transpose(1,2,0)
+            result = Image.fromarray((output * 255.0).astype(np.uint8))
+            filename = f"{uuid.uuid4()}.png"
+            filepath = os.path.join(output_dir, filename)
+            result.save(filepath)
+            return filepath
+

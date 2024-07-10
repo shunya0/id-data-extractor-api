@@ -11,3 +11,5 @@ flask_swagger_ui
 Flask_Limiter
 python-dotenv
 gunicorn
+ultralytics
+pytesseract

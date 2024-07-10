@@ -1,6 +1,10 @@
 import uuid
 import os
+import cv2
+import easyocr
+import pytesseract
 from preprocess import EnhanceImage
+from utils import ValidateImageType, ValidateImageTypeFormData, SaveAndPreprocessImage, SaveAndPreprocessImageFormData, YoloOcrProcessing, EnhancedImage
 from flask import Flask, request, jsonify, make_response, redirect, url_for
 # Initialize Flask app
 app = Flask(__name__, static_folder='./static')
@@ -16,7 +20,7 @@ from config import DevConfig, ProdConfig
 
 from werkzeug.utils import secure_filename
 from PIL import Image
-
+from ultralytics import YOLO
 
 env = os.getenv('ENV', 'dev')
 if env == 'dev':
@@ -28,11 +32,18 @@ else:
 
 app.config['DEBUG'] = config.DEBUG
 app.config['NER_MODEL_PATH'] = config.NER_MODEL_PATH
+app.config['TESSERACT_PATH'] = config.TESSERACT_PATH
+app.config['INDIAN_YOLO_PATH'] = config.INDIAN_YOLO_PATH
+app.config['UAE_YOLO_PATH'] = config.UAE_YOLO_PATH
 
 with app.app_context():
     from ocr import ExtractTextFromImage
-    from ner import ExtractEntities
+    # from ner import ExtractEntities
     from response import GenerateResponse
+    from utils import ValidateImageType, ValidateImageTypeFormData, SaveAndPreprocessImage, SaveAndPreprocessImageFormData, YoloOcrProcessing, EnhancedImage
+
+# pytesseract.pytesseract.tesseract_cmd = r'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
+pytesseract.pytesseract.tesseract_cmd = app.config['TESSERACT_PATH']
 
 # Configure limiter with global limit of 1000 requests per day
 limiter = Limiter(
@@ -88,162 +99,249 @@ def allowed_file(filename):
 def redirect_to_docs():
     return redirect(url_for('swagger_ui.show'))  
 
-@app.route('/api/v1/extract-data-from-image', methods=['POST'])
+# @app.route('/api/v1/extract-data-from-image', methods=['POST'])
+# @authenticate_api_key
+# @limiter.limit("500/day;50/hour")
+# def extract_data_from_image():
+#     # Check if request has a file part
+#     # print(request.data[:10])
+#     if 'image' not in request.files and not request.data:
+#         response = make_response(jsonify({'error': 'No image data found'}), 400)
+#         response.headers['Content-Type'] = 'application/json'
+#         return response
+
+#     filename = ''
+
+#     # Check if image data is in request.files (fallback for compatibility)
+#     if 'image' in request.files:
+#         file = request.files['image']
+#         # Check if user selected a file
+#         if file.filename == '':
+#             response = make_response(jsonify({'error': 'No selected file'}), 400)
+#             response.headers['Content-Type'] = 'application/json'
+#             return response
+        
+
+#         # Check allowed file extension
+#         if file and allowed_file(file.filename):
+#             # Generate unique filename using UUID
+#             filename = f"{uuid.uuid4()}.{file.filename.split('.')[-1]}"
+#             # Create images directory if it doesn't exist
+#             if not os.path.isdir('images'):
+#                 os.makedirs('images')
+#             filepath = os.path.join('images', filename)
+#             file.save(filepath)
+
+#             img = Image.open(filepath)  # Replace with your image path
+        
+#             # Converting RGBA image to RGB
+#             # if img.mode == "RGB":
+#             #     print("Image has 3 channels (RGB)")
+#             # else:
+#             #     print("Image has", len(img.getbands()), "channels (not RGB)")
+            
+#             #     img.load()
+#             #     background = Image.new("RGB", img.size, (255, 255, 255))
+                
+#             #     background.paste(img, mask=img.split()[3])
+
+#             #     background.save(filepath, 'PNG', quality=100)
+#             enhancedImageFilePath = filepath
+
+#             if len(img.getbands()) > 3:
+#                 print("Image has", len(img.getbands()), "channels (not RGB)")
+#                 img.load()
+#                 background = Image.new("RGB", img.size, (255, 255, 255))
+                
+#                 background.paste(img, mask=img.split()[3])
+
+#                 background.save(filepath, 'PNG', quality=100)
+
+#                 # Enhancing image
+#                 enhancedImageFilePath = EnhanceImage(filepath)
+#             elif len(img.getbands()) == 3:
+#                 print("Image has", len(img.getbands()), "channels (RGB)")
+#                 enhancedImageFilePath = EnhanceImage(filepath)
+            
+#             # Extracting text from image
+#             accumulated_text = ExtractTextFromImage(enhancedImageFilePath)
+            
+#             # Extracting entities
+#             entities = ExtractEntities(accumulated_text)
+
+#             # Generating Response
+#             response = GenerateResponse(entities)
+
+
+#             response = make_response(jsonify(response), 201)
+#             response.headers['Content-Type'] = 'application/json'
+#             return response
+
+#         # Extension not allowed
+#         response = make_response(jsonify({'error': 'File type not allowed'}), 415)
+#         response.headers['Content-Type'] = 'application/json'
+#         return response
+    
+#     # Check if image data is in request.data (binary data)
+#     if request.data:
+#         image_data = request.data
+#         # Check image type using magic numbers
+#         image_type = None
+#         for mime_type, magic_number in ALLOWED_MIME_TYPES.items():
+#             if image_data.startswith(magic_number):
+#                 image_type = mime_type
+#                 break
+        
+#         if not image_type:
+#             response = make_response(jsonify({'error': 'Unsupported image format'}), 415)
+#             response.headers['Content-Type'] = 'application/json'
+#             return response
+        
+#         # Generate unique filename using UUID
+#         filename = f"{uuid.uuid4()}.{image_type.split('/')[1]}"
+#         # Create images directory if it doesn't exist
+#         if not os.path.isdir('images'):
+#             os.makedirs('images')
+#         filepath = os.path.join('images', filename)
+        
+#         with open(filepath, 'wb') as f:
+#             f.write(image_data)
+
+#         # img = Image.open(filepath)  # Replace with your image path
+        
+#         # # Converting RGBA image to RGB
+#         # if img.mode == "RGB":
+#         #     print("Image has 3 channels (RGB)")
+#         # else:
+#         #     print("Image has", len(img.getbands()), "channels (not RGB)")
+        
+#         #     img.load()
+#         #     background = Image.new("RGB", img.size, (255, 255, 255))
+#         #     background.paste(img, mask=img.split()[3])
+
+#         #     background.save(filepath, 'PNG', quality=100)
+        
+#         enhancedImageFilePath = filepath
+
+#         if len(img.getbands()) > 3:
+#             print("Image has", len(img.getbands()), "channels (not RGB)")
+#             img.load()
+#             background = Image.new("RGB", img.size, (255, 255, 255))
+            
+#             background.paste(img, mask=img.split()[3])
+
+#             background.save(filepath, 'PNG', quality=100)
+
+#             # Enhancing image
+#             enhancedImageFilePath = EnhanceImage(filepath)
+#         elif len(img.getbands()) == 3:
+#             print("Image has", len(img.getbands()), "channels (RGB)")
+#             enhancedImageFilePath = EnhanceImage(filepath)
+        
+#         # Extracting text from image
+#         accumulated_text = ExtractTextFromImage(enhancedImageFilePath)
+        
+#         # Extracting entities
+#         entities = ExtractEntities(accumulated_text)
+
+#         # Generating Response
+#         response = GenerateResponse(entities)
+
+#         response = make_response(jsonify(response), 201)
+#         response.headers['Content-Type'] = 'application/json'
+#         return response
+#     else:
+#         response = make_response(jsonify({'error': 'Invalid image data format'}), 400)
+#         response.headers['Content-Type'] = 'application/json'
+#         return response 
+    
+
+
+@app.route('/api/v2/india/passport/extract-data-from-image', methods=['POST'])
 @authenticate_api_key
 @limiter.limit("500/day;50/hour")
-def upload_image():
+def indian_passport_extract_data_from_image():
     # Check if request has a file part
     # print(request.data[:10])
-    if 'image' not in request.files and not request.data:
-        response = make_response(jsonify({'error': 'No image data found'}), 400)
-        response.headers['Content-Type'] = 'application/json'
-        return response
+    model = YOLO(app.config['INDIAN_YOLO_PATH'])
+    names = model.names
 
-    filename = ''
-
-    # Check if image data is in request.files (fallback for compatibility)
     if 'image' in request.files:
-        file = request.files['image']
-        # Check if user selected a file
-        if file.filename == '':
-            response = make_response(jsonify({'error': 'No selected file'}), 400)
-            response.headers['Content-Type'] = 'application/json'
-            return response
-        
-
-        # Check allowed file extension
-        if file and allowed_file(file.filename):
-            # Generate unique filename using UUID
-            filename = f"{uuid.uuid4()}.{file.filename.split('.')[-1]}"
-            # Create images directory if it doesn't exist
-            if not os.path.isdir('images'):
-                os.makedirs('images')
-            filepath = os.path.join('images', filename)
-            file.save(filepath)
-
-            img = Image.open(filepath)  # Replace with your image path
-        
-            # Converting RGBA image to RGB
-            # if img.mode == "RGB":
-            #     print("Image has 3 channels (RGB)")
-            # else:
-            #     print("Image has", len(img.getbands()), "channels (not RGB)")
-            
-            #     img.load()
-            #     background = Image.new("RGB", img.size, (255, 255, 255))
-                
-            #     background.paste(img, mask=img.split()[3])
-
-            #     background.save(filepath, 'PNG', quality=100)
-            enhancedImageFilePath = filepath
-
-            if len(img.getbands()) > 3:
-                print("Image has", len(img.getbands()), "channels (not RGB)")
-                img.load()
-                background = Image.new("RGB", img.size, (255, 255, 255))
-                
-                background.paste(img, mask=img.split()[3])
-
-                background.save(filepath, 'PNG', quality=100)
-
-                # Enhancing image
-                enhancedImageFilePath = EnhanceImage(filepath)
-            elif len(img.getbands()) == 3:
-                print("Image has", len(img.getbands()), "channels (RGB)")
-                enhancedImageFilePath = EnhanceImage(filepath)
-            
-            # Extracting text from image
-            accumulated_text = ExtractTextFromImage(enhancedImageFilePath)
-            
-            # Extracting entities
-            entities = ExtractEntities(accumulated_text)
-
-            # Generating Response
-            response = GenerateResponse(entities)
-
-
-            response = make_response(jsonify(response), 201)
-            response.headers['Content-Type'] = 'application/json'
-            return response
-
-        # Extension not allowed
-        response = make_response(jsonify({'error': 'File type not allowed'}), 415)
-        response.headers['Content-Type'] = 'application/json'
-        return response
-    
-    # Check if image data is in request.data (binary data)
-    if request.data:
-        image_data = request.data
-        # Check image type using magic numbers
-        image_type = None
-        for mime_type, magic_number in ALLOWED_MIME_TYPES.items():
-            if image_data.startswith(magic_number):
-                image_type = mime_type
-                break
-        
+        # Handle form data
+        image_data = request.files['image']
+        if not image_data.filename:
+            return make_response(jsonify({'error': 'Missing image data'}), 400)
+        image_type = ValidateImageTypeFormData(image_data)  # Read the file to check type
         if not image_type:
-            response = make_response(jsonify({'error': 'Unsupported image format'}), 415)
-            response.headers['Content-Type'] = 'application/json'
-            return response
+            return make_response(jsonify({'error': 'Unsupported image format'}), 415)
         
-        # Generate unique filename using UUID
-        filename = f"{uuid.uuid4()}.{image_type.split('/')[1]}"
-        # Create images directory if it doesn't exist
-        if not os.path.isdir('images'):
-            os.makedirs('images')
-        filepath = os.path.join('images', filename)
-        
-        with open(filepath, 'wb') as f:
-            f.write(image_data)
-
-        # img = Image.open(filepath)  # Replace with your image path
-        
-        # # Converting RGBA image to RGB
-        # if img.mode == "RGB":
-        #     print("Image has 3 channels (RGB)")
-        # else:
-        #     print("Image has", len(img.getbands()), "channels (not RGB)")
-        
-        #     img.load()
-        #     background = Image.new("RGB", img.size, (255, 255, 255))
-        #     background.paste(img, mask=img.split()[3])
-
-        #     background.save(filepath, 'PNG', quality=100)
-        
-        enhancedImageFilePath = filepath
-
-        if len(img.getbands()) > 3:
-            print("Image has", len(img.getbands()), "channels (not RGB)")
-            img.load()
-            background = Image.new("RGB", img.size, (255, 255, 255))
-            
-            background.paste(img, mask=img.split()[3])
-
-            background.save(filepath, 'PNG', quality=100)
-
-            # Enhancing image
-            enhancedImageFilePath = EnhanceImage(filepath)
-        elif len(img.getbands()) == 3:
-            print("Image has", len(img.getbands()), "channels (RGB)")
-            enhancedImageFilePath = EnhanceImage(filepath)
-        
-        # Extracting text from image
-        accumulated_text = ExtractTextFromImage(enhancedImageFilePath)
-        
-        # Extracting entities
-        entities = ExtractEntities(accumulated_text)
-
-        # Generating Response
-        response = GenerateResponse(entities)
-
-        response = make_response(jsonify(response), 201)
-        response.headers['Content-Type'] = 'application/json'
-        return response
+        filepath, img = SaveAndPreprocessImageFormData(image_data, image_type)
     else:
-        response = make_response(jsonify({'error': 'Invalid image data format'}), 400)
-        response.headers['Content-Type'] = 'application/json'
-        return response 
+        # Handle binary data
+        if not request.data:
+            return make_response(jsonify({'error': 'Missing image data'}), 400)
+        image_data = request.data
+        from utils import ValidateImageType, SaveAndPreprocessImage
+        image_type = ValidateImageType(image_data)
+
+        if not image_type:
+            return make_response(jsonify({'error': 'Unsupported image format'}), 415)
+        
+        filepath, img = SaveAndPreprocessImage(request.data, image_type)
     
+    enhanced_filepath = EnhancedImage(filepath)
+
+    data = YoloOcrProcessing(enhanced_filepath, model, names, 'in')
+    if data is None:
+        return make_response(jsonify({'error': 'No objects detected'}), 404)
+
+    response = make_response(jsonify(data), 201)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
+
+@app.route('/api/v2/uae/passport/extract-data-from-image', methods=['POST'])
+@authenticate_api_key
+@limiter.limit("500/day;50/hour")
+def uae_passport_extract_data_from_image():
+    # Check if request has a file part
+    # print(request.data[:10])
+    model = YOLO(app.config['UAE_YOLO_PATH'])
+    names = model.names
+
+    if 'image' in request.files:
+        # Handle form data
+        image_data = request.files['image']
+        if not image_data.filename:
+            return make_response(jsonify({'error': 'Missing image data'}), 400)
+        image_type = ValidateImageTypeFormData(image_data)  # Read the file to check type
+        if not image_type:
+            return make_response(jsonify({'error': 'Unsupported image format'}), 415)
+        
+        filepath, img = SaveAndPreprocessImageFormData(image_data, image_type)
+    else:
+        # Handle binary data
+        if not request.data:
+            return make_response(jsonify({'error': 'Missing image data'}), 400)
+        image_data = request.data
+        from utils import ValidateImageType, SaveAndPreprocessImage
+        image_type = ValidateImageType(image_data)
+
+        if not image_type:
+            return make_response(jsonify({'error': 'Unsupported image format'}), 415)
+        
+        filepath, img = SaveAndPreprocessImage(request.data, image_type)
+    
+    enhanced_filepath = EnhancedImage(filepath)
+
+    data = YoloOcrProcessing(enhanced_filepath, model, names, 'uae')
+    if data is None:
+        return make_response(jsonify({'error': 'No objects detected'}), 404)
+
+    response = make_response(jsonify(data), 201)
+    response.headers['Content-Type'] = 'application/json'
+    return response
+
 
 if __name__ == '__main__':
     app.run(debug=app.config['DEBUG'])
