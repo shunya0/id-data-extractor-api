@@ -1,3 +1,4 @@
+import re
 import cv2, pytesseract, uuid, os
 from PIL import Image
 from preprocess import EnhancedImageGenerator
@@ -15,6 +16,23 @@ ALLOWED_MIME_TYPES = {
 def AllowedFile(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def RemoveSpecialChars(text):
+  """
+  Removes special characters from a string, excluding alphanumeric characters, -, /, and ..
+
+  Args:
+      text (str): The string to remove special characters from.
+      allowed_chars (str, optional): A regular expression pattern defining allowed characters. Defaults to "[a-zA-Z0-9\-/._]".
+
+  Returns:
+      str: The string with special characters removed.
+  """
+   # Compile the regular expression with optional flag for case-insensitivity
+  # pattern = re.compile(fr"[^\w{allowed_chars}]", flags=re.IGNORECASE)
+  pattern = re.compile(r"[^\w\-/\.\s]|\s{2,}|\n", flags=re.IGNORECASE)
+  return pattern.sub("", text.strip())
+
 
 def ValidateImageType(image_data):
   """
@@ -141,7 +159,7 @@ def YoloOcrProcessing(filepath, model, names, country):
         A dictionary containing extracted text data or None if no objects found.
     """
 
-    UAE_OMIT = ['uae_passport_front', 'uae_passport_photo', 'uae_passport_signature']
+    UAE_OMIT = ['uae_passport_front', 'uae_passport_photo', 'uae_passport_holder_signature']
     INDIA_OMIT = ['indian_passport_front', 'indian_passport_photo', 'indian_passport_signature']
     
     UAE_REPLACE_STR = 'uae_passport_'
@@ -174,6 +192,8 @@ def YoloOcrProcessing(filepath, model, names, country):
             result = pytesseract.image_to_string(crop_obj, config='--psm 6')  # Assuming scene text mode
 
             if result:
-                data[cls_name.replace(FINAL_REPLACE_STR, "")] = result.replace('\n', '')
+                data[cls_name.replace(FINAL_REPLACE_STR, "")] = RemoveSpecialChars(result)
+            else:
+                data[cls_name.replace(FINAL_REPLACE_STR, "")] = ""
 
     return data
